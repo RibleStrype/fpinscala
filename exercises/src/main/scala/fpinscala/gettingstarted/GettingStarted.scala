@@ -1,4 +1,5 @@
 package fpinscala.gettingstarted
+import scala.annotation.tailrec
 
 // A comment!
 /* Another comment */
@@ -36,7 +37,13 @@ object MyModule {
 
   // Exercise 1: Write a function to compute the nth fibonacci number
 
-  def fib(n: Int): Int = ???
+  def fib(n: Int): Long = {
+    @tailrec
+    def go(a: Long, b: Long, n: Int): Long =
+      if (n == 0) a
+      else go(b, a + b, n - 1)
+    go(0, 1, n)
+  }
 
   // This definition and `formatAbs` are very similar..
   private def formatFactorial(n: Int) = {
@@ -140,7 +147,14 @@ object PolymorphicFunctions {
 
   // Exercise 2: Implement a polymorphic function to check whether
   // an `Array[A]` is sorted
-  def isSorted[A](as: Array[A], gt: (A,A) => Boolean): Boolean = ???
+  def isSorted[A](as: Array[A], gt: (A,A) => Boolean): Boolean = {
+    @tailrec
+    def go(i: Int): Boolean =
+      if (i >= as.length) true
+      else if (gt(as(i - 1), as(i))) false
+      else go(i + 1)
+    go(1)
+  }
 
   // Polymorphic functions are often so constrained by their type
   // that they only have one implementation! Here's an example:

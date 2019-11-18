@@ -12,3 +12,4 @@ project.vim
 .metadata/
 .bloop/
 .metals/
+.java-version

@@ -1,4 +1,5 @@
 package fpinscala.datastructures
+import scala.annotation.tailrec
 
 sealed trait List[+A] // `List` data type, parameterized on a type, `A`
 case object Nil extends List[Nothing] // A `List` data constructor representing the empty list
@@ -62,8 +63,7 @@ object List { // `List` companion object. Contains functions for creating and wo
 
   def drop[A](l: List[A], n: Int): List[A] = 
     if (n <= 0) l
-    else l match {
-      case Nil           => Nil
+    else l match {      case Nil           => Nil
       case Cons(_, tail) => drop(tail, n - 1)
     }
 
@@ -79,9 +79,40 @@ object List { // `List` companion object. Contains functions for creating and wo
     case Cons(h, t)   => Cons(h, init(t))
   }
 
-  def length[A](l: List[A]): Int = ???
+  def length[A](l: List[A]): Int = foldRight(l, 0)((_, acc) => acc + 1)
 
-  def foldLeft[A,B](l: List[A], z: B)(f: (B, A) => B): B = ???
+  @tailrec
+  def foldLeft[A,B](l: List[A], z: B)(f: (B, A) => B): B = l match {
+    case Nil        => z
+    case Cons(h, t) => foldLeft(t, f(z, h))(f)
+  }
+
+  def sum3(ns: List[Int]): Int = foldLeft(ns, 0)(_ + _)
+
+  def product3(ns: List[Int]): Int = foldLeft(ns, 0)(_ + _)
+
+  def length2[A](l: List[A]): Int = foldLeft(l, 0)((acc, _) => acc + 1)
+
+  def reverse[A](l: List[A]): List[A] = foldLeft(l, Nil: List[A])((acc, h) => Cons(h, acc))
+
+  def foldRightViaFoldLeft[A,B](as: List[A], z: B)(f: (A, B) => B): B =
+    foldLeft(as, (b: B) => b) { (acc, a) =>
+      b => acc(f(a, b))
+    }(z)
+
+  def foldLeftViaFoldRight[A,B](as: List[A], z: B)(f: (B, A) => B): B =
+    foldRight(as, (b: B) => b) { (a, acc) =>
+      b => acc(f(b, a))
+    }(z)
+
+  def append2[A](xs: List[A], ys: List[A]): List[A] =
+    foldRight(xs, ys)((x, ys) => Cons(x, ys))
+
+  def append3[A](xs: List[A], ys: List[A]): List[A] =
+    foldLeft(reverse(xs), ys)((ys, x) => Cons(x, ys))
+
+  def concat[A](l: List[List[A]]): List[A] =
+    foldRight(l, Nil: List[A])(append)
 
   def map[A,B](l: List[A])(f: A => B): List[B] = ???
 }

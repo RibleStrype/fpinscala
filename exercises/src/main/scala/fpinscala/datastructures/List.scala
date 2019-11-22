@@ -142,4 +142,23 @@ object List { // `List` companion object. Contains functions for creating and wo
       case (Cons(a, as), Cons(b, bs)) => Cons(f(a, b), zipWith(as, bs)(f))
       case _ => Nil
     }
+
+  def hasSubsequence[A](sup: List[A], sub: List[A]): Boolean = {
+    @tailrec
+    def startsWith(sup: List[A], sub: List[A]): Boolean = (sup, sub) match {
+      case (_, Nil) => true
+      case (Nil, _) => false
+      case (Cons(h1, t1), Cons(h2, t2)) => h1 == h2 && startsWith(t1, t2)
+    }
+
+    @tailrec
+    def go(sup: List[A]): Boolean =
+      if (startsWith(sup, sub)) true
+      else sup match {
+        case Nil => false
+        case Cons(_, t) => go(t)
+      }
+
+    go(sup)
+  }
 }

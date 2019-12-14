@@ -104,6 +104,12 @@ trait Stream[+A] {
       case s@Cons(h, t) => Some((s, t()))
     }
 
+  def scanRight[B](z: => B)(f: (A, B) => B): Stream[B] =
+    foldRight(Stream(z)) {
+      case (a, bs@Cons(h, _)) => cons(f(a, h()), bs)
+      case _                  => empty
+    }
+
   def toList: List[A] = this match {
     case Empty      => Nil
     case Cons(h, t) => h() :: t().toList

@@ -93,7 +93,16 @@ trait Stream[+A] {
       case _                            => None
     }
 
-  def startsWith[B](s: Stream[B]): Boolean = ???
+  def startsWith[B](s: Stream[B]): Boolean =
+    zipAll(s)
+      .takeWhile { case (_, b) => b.isDefined }
+      .forAll { case (a, b) => a == b }
+
+  def tails: Stream[Stream[A]] =
+    unfold(this) {
+      case Empty        => None
+      case s@Cons(h, t) => Some((s, t()))
+    }
 
   def toList: List[A] = this match {
     case Empty      => Nil

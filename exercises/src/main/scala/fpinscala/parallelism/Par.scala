@@ -16,6 +16,24 @@ object Par {
     def isCancelled = false 
     def cancel(evenIfRunning: Boolean): Boolean = false 
   }
+
+  private case class Map2Future[A, B, C](fa: Future[A], fb: Future[B], f: (A, B) => C) extends Future[C] {
+    def isDone = fa.isDone() && fb.isDone()
+    def get() = {
+      f(fa.get(), fb.get())
+    }
+    def get(timeout: Long, units: TimeUnit) = {
+      val startMillis = System.currentTimeMillis()
+      val a = fa.get(timeout, units)
+      val millisElapsed = System.currentTimeMillis() - startMillis
+      val millisLeft = units.toMillis(timeout) - millisElapsed
+      val b = fb.get(millisLeft, TimeUnit.MILLISECONDS)
+      f(a, b)
+    }
+    def isCancelled(): Boolean = fa.isCancelled() || fb.isCancelled()
+    def cancel(evenIfRunning: Boolean): Boolean = 
+      fa.cancel(evenIfRunning) || fb.cancel(evenIfRunning)
+  }
   
   def map2[A,B,C](a: Par[A], b: Par[B])(f: (A,B) => C): Par[C] = // `map2` doesn't evaluate the call to `f` in a separate logical thread, in accord with our design choice of having `fork` be the sole function in the API for controlling parallelism. We can always do `fork(map2(a,b)(f))` if we want the evaluation of `f` to occur in a separate thread.
     (es: ExecutorService) => {

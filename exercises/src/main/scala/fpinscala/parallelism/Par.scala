@@ -68,7 +68,18 @@ object Par {
   def asyncF[A,B](f: A => B): A => Par[B] = a => lazyUnit(f(a))
 
   def sequence[A](ps: List[Par[A]]): Par[List[A]] =
-    ps.foldRight(unit(List.empty[A]))(map2(_, _)(_ :: _))
+    traverse(ps)(x => x)
+
+  def traverse[A, B](ps: List[A])(f: A => Par[B]): Par[List[B]] =
+    ps.foldRight(unit(List.empty[B]))((a, bs) => map2(f(a), bs)(_ :: _))
+
+  def parMap[A,B](ps: List[A])(f: A => B): Par[List[B]] = fork { 
+    val fbs: List[Par[B]] = ps.map(asyncF(f))
+    sequence(fbs)
+  }
+
+  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] =
+    parMap(as)(a => if (f(a)) List(a) else List.empty).map(_.flatten)
 
   /* Gives us infix syntax for `Par`. */
   implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)

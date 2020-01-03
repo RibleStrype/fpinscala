@@ -2,6 +2,7 @@ package fpinscala.parallelism
 
 import java.util.concurrent._
 import language.implicitConversions
+import scala.annotation.tailrec
 
 object Par {
   type Par[A] = ExecutorService => Future[A]
@@ -81,6 +82,17 @@ object Par {
   def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] =
     parMap(as)(a => if (f(a)) List(a) else List.empty).map(_.flatten)
 
+  def binaryReduce[A](as: IndexedSeq[A])(z: => A)(f: (A, A) => A): Par[A] =
+    if (as.length <= 1)
+      unit(as.headOption getOrElse z)
+    else {
+      val (l, r) = as.splitAt(as.length / 2)
+      map2(binaryReduce(l)(z)(f), binaryReduce(r)(z)(f))(f)
+    }
+
+  def equal[A](p1: Par[A], p2: Par[A])(ec: ExecutorService): Boolean =
+    p1(ec).get() == p2(ec).get
+
   /* Gives us infix syntax for `Par`. */
   implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)
 
@@ -100,5 +112,4 @@ object Examples {
       val (l,r) = ints.splitAt(ints.length/2) // Divide the sequence in half using the `splitAt` function.
       sum(l) + sum(r) // Recursively sum both halves and add the results together.
     }
-
 }

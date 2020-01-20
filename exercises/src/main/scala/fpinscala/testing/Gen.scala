@@ -8,21 +8,71 @@ import fpinscala.parallelism.Par.Par
 import Gen._
 import Prop._
 import java.util.concurrent.{Executors,ExecutorService}
+import scala.util.control.NonFatal
 
 /*
 The library developed in this chapter goes through several iterations. This file is just the
 shell, which you can fill in and modify while working through the chapter.
 */
 
-trait Prop { self =>
-  def check: Boolean
-  def &&(p: Prop): Prop = new Prop {
-    def check: Boolean = self.check && p.check
-  }
+case class Prop(run: (TestCases, RNG) => Result) { self =>
+  def &&(p: Prop): Prop =
+    Prop { (testCases, rng) =>
+      run(testCases, rng) match {
+        case Passed             => p.run(testCases, rng)
+        case failure: Falsified => failure
+      }
+    }
+  def ||(p: Prop): Prop =
+    Prop { (testCases, rng) =>
+      run(testCases, rng) match {
+        case Passed       => Passed
+        case _: Falsified => p.run(testCases, rng)
+      }
+    }
 }
 
 object Prop {
-  def forAll[A](gen: Gen[A])(f: A => Boolean): Prop = ???
+  type TestCases = Int
+  type FailedCase = String
+  type SuccessCount = Int
+
+  sealed trait Result {
+    def isFalsified: Boolean
+  }
+  case object Passed extends Result {
+    override def isFalsified = false
+  }
+  final case class Falsified(failure: FailedCase,
+                             successCount: SuccessCount) extends Result {
+    override def isFalsified: Boolean = true
+  }
+
+  def forAll[A](gen: Gen[A])(f: A => Boolean): Prop =
+    Prop { (testCases, rng) =>
+      randomStream[A](gen)(rng)
+        .zipWith(Stream.from(0)) {
+          case (a, i) =>
+            try {
+              if (f(a)) Passed
+              else Falsified(a.toString(), i)
+            } catch {
+              case NonFatal(t) => Falsified(buildMsg(a, t), i)
+            }
+        }
+        .find(_.isFalsified)
+        .getOrElse(Passed)
+    }
+
+  private def randomStream[A](gen: Gen[A])(rng: RNG): Stream[A] =
+    Stream.unfold(rng) { rng =>
+      Some(gen.sample.run(rng))
+    }
+
+  private def buildMsg[A](a: A, t: Throwable): String =
+    s"test case: $a\n" +
+    s"generated an exception: ${t.getMessage}\n" +
+    s"stack trace:\n${t.getStackTrace().mkString("\n")}"
 }
 
 case class Gen[A](sample: Rand[A]) {

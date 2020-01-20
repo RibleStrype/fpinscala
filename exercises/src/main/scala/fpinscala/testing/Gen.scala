@@ -42,6 +42,8 @@ object Gen {
 
   val boolean: Gen[Boolean] = Gen(RNG.boolean)
 
+  val double: Gen[Double] = Gen(RNG.double)
+
   def choose(start: Int, stopExclusive: Int): Gen[Int] =
     Gen(RNG.choose(start, stopExclusive))
 
@@ -53,5 +55,16 @@ object Gen {
 
   def union[A](g1: Gen[A], g2: Gen[A]): Gen[A] =
     boolean.flatMap(b => if(b) g1 else g2)
+
+  def weighted[A](g1: (Gen[A],Double), g2: (Gen[A],Double)): Gen[A] = {
+    val (gen1, weight1) = g1
+    val (gen2, weight2) = g2
+    val totalWeight = weight1 + weight2
+    val ratio1 = weight1 / totalWeight
+    double.flatMap { d =>
+      if (d < ratio1) gen1
+      else gen2
+    }
+  }
 }
 

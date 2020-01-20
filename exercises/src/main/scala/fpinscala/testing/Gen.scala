@@ -2,6 +2,7 @@ package fpinscala.testing
 
 import fpinscala.laziness.Stream
 import fpinscala.state._
+import fpinscala.state.RNG._
 import fpinscala.parallelism._
 import fpinscala.parallelism.Par.Par
 import Gen._
@@ -24,38 +25,30 @@ object Prop {
   def forAll[A](gen: Gen[A])(f: A => Boolean): Prop = ???
 }
 
+case class Gen[A](sample: Rand[A]) {
+
+  def flatMap[B](f: A => Gen[B]): Gen[B] = 
+    Gen(sample.flatMap(a => f(a).sample))
+
+  def listOfN(size: Gen[Int]): Gen[List[A]] =
+    size.flatMap(Gen.listOfN(_, this))
+}
+
 object Gen {
   import fpinscala.state.RNG
   import fpinscala.state.RNG.Rand
 
-  def unit[A](a: => A): Gen[A] = RandGen(State.unit(a))
+  def unit[A](a: => A): Gen[A] = Gen(State.unit(a))
 
-  val boolean: Gen[Boolean] = RandGen(RNG.boolean)
+  val boolean: Gen[Boolean] = Gen(RNG.boolean)
 
   def choose(start: Int, stopExclusive: Int): Gen[Int] =
-    RandGen(RNG.choose(start, stopExclusive))
+    Gen(RNG.choose(start, stopExclusive))
 
   def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] =
     sequence(List.fill(n)(g))
 
   def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
-    gs.foldRight[Gen[List[A]]](unit(List.empty))(_.map2(_)(_ :: _))
-
-  case class RandGen[A](sample: Rand[A]) extends Gen[A]
-}
-
-trait Gen[A] {
-  def map[A,B](f: A => B): Gen[B] = ???
-  def flatMap[A,B](f: A => Gen[B]): Gen[B] = ???
-  def map2[B,C](g: Gen[B])(f: (A,B) => C): Gen[C] =
-    flatMap { a: A =>
-      g.map { b =>
-        f(a, b)
-      }
-    }
-}
-
-trait SGen[+A] {
-
+    Gen(State.sequence(gs.map(_.sample)))
 }
 

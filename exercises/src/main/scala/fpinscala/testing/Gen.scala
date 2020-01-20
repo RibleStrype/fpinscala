@@ -30,8 +30,16 @@ object Gen {
 
   def unit[A](a: => A): Gen[A] = RandGen(State.unit(a))
 
+  val boolean: Gen[Boolean] = RandGen(RNG.boolean)
+
   def choose(start: Int, stopExclusive: Int): Gen[Int] =
     RandGen(RNG.choose(start, stopExclusive))
+
+  def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] =
+    sequence(List.fill(n)(g))
+
+  def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
+    gs.foldRight[Gen[List[A]]](unit(List.empty))(_.map2(_)(_ :: _))
 
   case class RandGen[A](sample: Rand[A]) extends Gen[A]
 }
@@ -39,6 +47,12 @@ object Gen {
 trait Gen[A] {
   def map[A,B](f: A => B): Gen[B] = ???
   def flatMap[A,B](f: A => Gen[B]): Gen[B] = ???
+  def map2[B,C](g: Gen[B])(f: (A,B) => C): Gen[C] =
+    flatMap { a: A =>
+      g.map { b =>
+        f(a, b)
+      }
+    }
 }
 
 trait SGen[+A] {

@@ -22,6 +22,8 @@ object RNG {
 
   val int: Rand[Int] = State(_.nextInt)
 
+  val boolean: Rand[Boolean] = int.map(_ < 0)
+
   def unit[A](a: A): Rand[A] =
     State(rng => (a, rng))
 
@@ -45,10 +47,10 @@ object RNG {
     } yield (d1, d2, d3)
 
   def ints(count: Int): Rand[List[Int]] =
-    sequence(List.fill(count)(int))
+    listOfN(count, int)
 
-  def sequence[A](fs: List[Rand[A]]): Rand[List[A]] =
-    fs.foldRight(unit(List.empty[A]))(_.map2(_)(_ :: _))
+  def listOfN[A](n: Int, r: Rand[A]): Rand[List[A]] =
+    State.sequence(List.fill(n)(r))
 
   def nonNegativeLessThan(n: Int): Rand[Int] =
     nonNegativeInt.flatMap { i =>

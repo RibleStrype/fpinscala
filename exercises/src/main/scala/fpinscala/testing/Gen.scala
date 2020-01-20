@@ -50,5 +50,8 @@ object Gen {
 
   def sequence[A](gs: List[Gen[A]]): Gen[List[A]] =
     Gen(State.sequence(gs.map(_.sample)))
+
+  def union[A](g1: Gen[A], g2: Gen[A]): Gen[A] =
+    boolean.flatMap(b => if(b) g1 else g2)
 }
 

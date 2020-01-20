@@ -25,7 +25,15 @@ object Prop {
 }
 
 object Gen {
-  def unit[A](a: => A): Gen[A] = ???
+  import fpinscala.state.RNG
+  import fpinscala.state.RNG.Rand
+
+  def unit[A](a: => A): Gen[A] = RandGen(State.unit(a))
+
+  def choose(start: Int, stopExclusive: Int): Gen[Int] =
+    RandGen(RNG.choose(start, stopExclusive))
+
+  case class RandGen[A](sample: Rand[A]) extends Gen[A]
 }
 
 trait Gen[A] {

@@ -15,24 +15,25 @@ The library developed in this chapter goes through several iterations. This file
 shell, which you can fill in and modify while working through the chapter.
 */
 
-case class Prop(run: (TestCases, RNG) => Result) { self =>
+case class Prop(run: (MaxSize, TestCases, RNG) => Result) { self =>
   def &&(p: Prop): Prop =
-    Prop { (testCases, rng) =>
-      run(testCases, rng) match {
-        case Passed             => p.run(testCases, rng)
+    Prop { (maxSize, testCases, rng) =>
+      run(maxSize, testCases, rng) match {
+        case Passed             => p.run(maxSize, testCases, rng)
         case failure: Falsified => failure
       }
     }
   def ||(p: Prop): Prop =
-    Prop { (testCases, rng) =>
-      run(testCases, rng) match {
+    Prop { (maxSize, testCases, rng) =>
+      run(maxSize, testCases, rng) match {
         case Passed       => Passed
-        case _: Falsified => p.run(testCases, rng)
+        case _: Falsified => p.run(maxSize, testCases, rng)
       }
     }
 }
 
 object Prop {
+  type MaxSize = Int
   type TestCases = Int
   type FailedCase = String
   type SuccessCount = Int
@@ -49,8 +50,9 @@ object Prop {
   }
 
   def forAll[A](gen: Gen[A])(f: A => Boolean): Prop =
-    Prop { (testCases, rng) =>
+    Prop { (_, testCases, rng) =>
       randomStream[A](gen)(rng)
+        .take(testCases)
         .zipWith(Stream.from(0)) {
           case (a, i) =>
             try {
@@ -64,6 +66,39 @@ object Prop {
         .getOrElse(Passed)
     }
 
+  def forAll[A](g: SGen[A])(f: A => Boolean): Prop =
+    forAll(g.forSize)(f)
+
+  def forAll[A](g: Int => Gen[A])(f: A => Boolean): Prop =
+    Prop { (maxSize, testCases, rng) =>
+      val casesPerSize = (testCases + (maxSize - 1)) / maxSize
+      Stream.from(0)
+        .map(g)
+        .map(forAll(_)(f))
+        .map { p =>
+          Prop { (maxSize, _, rng) =>
+            p.run(maxSize, casesPerSize, rng)
+          }
+        }
+        .take((testCases min maxSize) + 1)
+        .toList
+        .reduce(_ && _)
+        .run(maxSize, testCases, rng)
+    }
+
+  def run(
+    p: Prop,
+    maxSize: Int = 100,
+    testCases: Int = 100,
+    rng: RNG = RNG.Simple(System.currentTimeMillis())
+  ): Unit = 
+    p.run(maxSize, testCases, rng) match {
+      case Falsified(msg, n) => 
+        println(s"! Falsified after $n passed tests:\n $msg")
+      case Passed => 
+        println(s"+ OK, passed $testCases tests")
+    }
+
   private def randomStream[A](gen: Gen[A])(rng: RNG): Stream[A] =
     Stream.unfold(rng) { rng =>
       Some(gen.sample.run(rng))
@@ -73,6 +108,18 @@ object Prop {
     s"test case: $a\n" +
     s"generated an exception: ${t.getMessage}\n" +
     s"stack trace:\n${t.getStackTrace().mkString("\n")}"
+
+  object Samples {
+    val smallInt = Gen.choose(-10,10)
+    val maxProp = forAll(listOf1(smallInt)) { ns =>
+      val max = ns.max
+      !ns.exists(_ > max)
+    }
+    val sortedProp = forAll(listOf1(smallInt)) { ns =>
+      val sorted = ns.sorted
+      sorted.head == sorted.min && sorted.last == sorted.max
+    }
+  }
 }
 
 case class Gen[+A](sample: Rand[A]) { self =>
@@ -121,6 +168,9 @@ object Gen {
 
   def listOf[A](g: Gen[A]): SGen[List[A]] =
     SGen(listOfN(_, g))
+
+  def listOf1[A](g: Gen[A]): SGen[List[A]] =
+    SGen(size => listOfN(size max 1, g))
 }
 
 case class SGen[+A](forSize: Int => Gen[A]) {

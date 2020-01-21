@@ -75,13 +75,15 @@ object Prop {
     s"stack trace:\n${t.getStackTrace().mkString("\n")}"
 }
 
-case class Gen[A](sample: Rand[A]) {
+case class Gen[+A](sample: Rand[A]) { self =>
 
   def flatMap[B](f: A => Gen[B]): Gen[B] = 
     Gen(sample.flatMap(a => f(a).sample))
 
   def listOfN(size: Gen[Int]): Gen[List[A]] =
     size.flatMap(Gen.listOfN(_, this))
+
+  def unsized: SGen[A] = SGen(_ => self)
 }
 
 object Gen {
@@ -116,5 +118,17 @@ object Gen {
       else gen2
     }
   }
+
+  def listOf[A](g: Gen[A]): SGen[List[A]] =
+    SGen(listOfN(_, g))
 }
 
+case class SGen[+A](forSize: Int => Gen[A]) {
+
+  def flatMap[B](f: A => SGen[B]): SGen[B] =
+    SGen { size =>
+      forSize(size).flatMap { a =>
+        f(a).forSize(size)
+      }
+    }
+}

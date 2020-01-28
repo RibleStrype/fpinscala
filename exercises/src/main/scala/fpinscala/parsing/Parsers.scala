@@ -6,7 +6,6 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
 
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
   def or[A](p1: Parser[A], p2: Parser[A]): Parser[A]
-  def manyN[A](n: Int, p: Parser[A]): Parser[List[A]]
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]
   def slice[A](p: Parser[A]): Parser[String]
   def product[A, B](p1: Parser[A], p2: Parser[B]): Parser[(A, B)]
@@ -21,6 +20,9 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
     map2(p, many(p))(_ :: _) | succeed(List.empty)
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
+  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] =
+    if (n <= 0) succeed(List.empty)
+    else map2(p, listOfN(n - 1, p))(_ :: _)
 
   implicit def string(s: String): Parser[String]
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps[A](p)
@@ -31,7 +33,6 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
     def or[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def |[B >: A](p2: Parser[B]): Parser[B] = self.or(p, p2)
     def many: Parser[List[A]] = self.many(p)
-    def manyN(n: Int): Parser[List[A]] = self.manyN(n, p)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
     def **[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
     def slice: Parser[String] = self.slice(p)

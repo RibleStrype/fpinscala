@@ -1,6 +1,7 @@
 package fpinscala.parsing
 
 import language.higherKinds
+import scala.util.matching.Regex
 
 trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trait
 
@@ -9,6 +10,7 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
   def map[A, B](p: Parser[A])(f: A => B): Parser[B]
   def slice[A](p: Parser[A]): Parser[String]
   def product[A, B](p1: Parser[A], p2: => Parser[B]): Parser[(A, B)]
+  def flatMap[A,B](p: Parser[A])(f: A => Parser[B]): Parser[B]
 
   def char(c: Char): Parser[Char] =
     string(c.toString()).map(_.charAt(0))
@@ -25,6 +27,7 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
     else map2(p, listOfN(n - 1, p))(_ :: _)
 
   implicit def string(s: String): Parser[String]
+  implicit def regex(r: Regex): Parser[String]
   implicit def operators[A](p: Parser[A]): ParserOps[A] = ParserOps[A](p)
   implicit def asStringParser[A](a: A)(implicit f: A => Parser[A]): ParserOps[A] =
     ParserOps(f(a))
@@ -34,6 +37,7 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
     def |[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
     def many: Parser[List[A]] = self.many(p)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
+    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
     def **[B](p2: => Parser[B]): Parser[(A, B)] = self.product(p, p2)
     def slice: Parser[String] = self.slice(p)
   }
@@ -52,6 +56,9 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
         case (a, s) => run(succeed(a))(s) == Right(a)
       }
   }
+
+  val int = regex(raw"\d+".r).map(_.toInt)
+  val nAs: Parser[List[Char]] = int.flatMap(listOfN(_, char('a')))
 }
 
 case class Location(input: String, offset: Int = 0) {

@@ -7,7 +7,6 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
 
   def run[A](p: Parser[A])(input: String): Either[ParseError, A]
   def or[A](p1: Parser[A], p2: => Parser[A]): Parser[A]
-  def map[A, B](p: Parser[A])(f: A => B): Parser[B]
   def slice[A](p: Parser[A]): Parser[String]
   def flatMap[A,B](p: Parser[A])(f: A => Parser[B]): Parser[B]
 
@@ -25,6 +24,8 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
       a <- p1
       b <- p2
     } yield f(a, b)
+  def map[A, B](p: Parser[A])(f: A => B): Parser[B] =
+    map2(p, string(""))((a, _) => f(a))
   def many[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _) | succeed(List.empty)
   def many1[A](p: Parser[A]): Parser[List[A]] =

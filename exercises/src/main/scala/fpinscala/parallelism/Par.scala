@@ -76,6 +76,12 @@ object Par {
       case false => 1
     })(List(ifTrue, ifFalse))
 
+  def flatMap[A,B](p: Par[A])(choices: A => Par[B]): Par[B] =
+    es => {
+      val k = run(es)(p).get
+      run(es)(choices(k))
+    }
+
   def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
 
   def asyncF[A,B](f: A => B): A => Par[B] = a => lazyUnit(f(a))

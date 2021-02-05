@@ -62,17 +62,42 @@ object Monad {
       ma flatMap f
   }
 
-  val parMonad: Monad[Par] = ???
+  val parMonad: Monad[Par] = new Monad[Par] {
+    override def unit[A](a: => A): Par.Par[A] = Par.unit(a)
+    override def flatMap[A, B](ma: Par.Par[A])(f: A => Par.Par[B]): Par.Par[B] = 
+      Par.flatMap(ma)(f)
+  }
 
-  def parserMonad[P[+_]](p: Parsers[P]): Monad[P] = ???
+  def parserMonad[P[+_]](p: Parsers[P]): Monad[P] = new Monad[P] {
+    override def unit[A](a: => A): P[A] = p.succeed(a)
+    override def flatMap[A, B](ma: P[A])(f: A => P[B]): P[B] =
+      p.flatMap(ma)(f)
+  }
 
-  val optionMonad: Monad[Option] = ???
+  val optionMonad: Monad[Option] = new Monad[Option] {
+    override def unit[A](a: => A): Option[A] = Some(a)
+    override def flatMap[A, B](ma: Option[A])(f: A => Option[B]): Option[B] =
+      ma flatMap f
+  }
 
-  val streamMonad: Monad[Stream] = ???
+  val streamMonad: Monad[Stream] = new Monad[Stream] {
+    override def unit[A](a: => A): Stream[A] = Stream(a)
+    override def flatMap[A, B](ma: Stream[A])(f: A => Stream[B]): Stream[B] =
+      ma flatMap f
+  }
 
-  val listMonad: Monad[List] = ???
+  val listMonad: Monad[List] = new Monad[List] {
+    override def unit[A](a: => A): List[A] = List(a)
+    override def flatMap[A, B](ma: List[A])(f: A => List[B]): List[B] = 
+      ma flatMap f
+  }
 
-  def stateMonad[S] = ???
+  def stateMonad[S]: Monad[({type L[A] = State[S, A]})#L] =
+    new Monad[({type L[A] = State[S, A]})#L] {
+      override def unit[A](a: => A): State[S, A] = State.unit(a)
+      override def flatMap[A, B](ma: State[S,A])(f: A => State[S,B]): State[S,B] =
+        ma flatMap f
+    }
 
   val idMonad: Monad[Id] = ???
 

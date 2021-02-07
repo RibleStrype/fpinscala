@@ -69,7 +69,10 @@ trait Applicative[F[_]] extends Functor[F] { self =>
         self.map2(fab, fa)(G.apply(_)(_))
     }
 
-  def sequenceMap[K,V](ofa: Map[K,F[V]]): F[Map[K,V]] = ???
+  def sequenceMap[K,V](ofa: Map[K,F[V]]): F[Map[K,V]] =
+    ofa.foldLeft(unit(Map.empty[K, V])) { (fm, kv) =>
+      map2(fm, kv._2)((m, v) => m.updated(kv._1, v))
+    }
 }
 
 case class Tree[+A](head: A, tail: List[Tree[A]])

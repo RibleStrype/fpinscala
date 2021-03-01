@@ -514,10 +514,17 @@ object IO3 {
   // Exercise 4 (optional, hard): Implement `runConsole` using `runFree`,
   // without going through `Par`. Hint: define `translate` using `runFree`.
 
-  def translate[F[_],G[_],A](f: Free[F,A])(fg: F ~> G): Free[G,A] = ???
+  def translate[F[_],G[_],A](f: Free[F,A])(fg: F ~> G): Free[G,A] = {
+    val translate = new Translate[F, ({type f[X] = Free[G,X]})#f] {
+      override def apply[X](f: F[X]): Free[G,X] = Suspend(fg(f))
+    }
+    val m = freeMonad[G]
+    runFree[F, ({type f[X] = Free[G,X]})#f, A](f)(translate)(m)
+  }
 
-  def runConsole[A](a: Free[Console,A]): A = ???
-
+  def runConsole[A](a: Free[Console,A]): A = {
+    runTrampoline(translate(a)(consoleToFunction0))
+  }
   /*
   There is nothing about `Free[Console,A]` that requires we interpret
   `Console` using side effects. Here are two pure ways of interpreting
@@ -596,7 +603,20 @@ object IO3 {
 
   def read(file: AsynchronousFileChannel,
            fromPosition: Long,
-           numBytes: Int): Par[Either[Throwable, Array[Byte]]] = ???
+           numBytes: Int): Par[Either[Throwable, Array[Byte]]] = 
+    Par.async { cb =>
+      val buf = ByteBuffer.allocate(numBytes)
+      file.read(buf, fromPosition, (), new CompletionHandler[Integer, Unit] {
+        override def completed(bytesRead: Integer, x$2: Unit): Unit = {
+          val bytes = new Array[Byte](bytesRead)
+          buf.slice().get(bytes, 0, bytesRead)
+          cb(Right(bytes))
+        }
+
+        override def failed(t: Throwable, x$2: Unit): Unit = 
+          cb(Left(t))
+      })
+    }
 
   // Provides the syntax `Async { k => ... }` for asyncronous IO blocks.
   def Async[A](cb: (A => Unit) => Unit): IO[A] =

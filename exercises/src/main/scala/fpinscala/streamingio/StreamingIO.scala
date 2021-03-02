@@ -292,13 +292,25 @@ object SimpleStreamTransducers {
     /*
      * Exercise 1: Implement `take`, `drop`, `takeWhile`, and `dropWhile`.
      */
-    def take[I](n: Int): Process[I,I] = ???
+    def take[I](n: Int): Process[I,I] = 
+      if (n > 0) await(x => emit(x, take(n - 1)))
+      else Halt()
+      
+    def drop[I](n: Int): Process[I,I] = 
+      if (n > 0) await(_ => drop(n - 1))
+      else id
 
-    def drop[I](n: Int): Process[I,I] = ???
+    def takeWhile[I](f: I => Boolean): Process[I,I] = 
+      await { x =>
+        if (f(x)) emit(x, takeWhile(f))
+        else Halt()
+      }
 
-    def takeWhile[I](f: I => Boolean): Process[I,I] = ???
-
-    def dropWhile[I](f: I => Boolean): Process[I,I] = ???
+    def dropWhile[I](f: I => Boolean): Process[I,I] = 
+      await { x =>
+        if (f(x)) dropWhile(f)
+        else emit(x, id)
+      }
 
     /* The identity `Process`, just repeatedly echos its input. */
     def id[I]: Process[I,I] = lift(identity)

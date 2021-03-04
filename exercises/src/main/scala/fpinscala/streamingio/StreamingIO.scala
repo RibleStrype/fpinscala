@@ -136,7 +136,16 @@ object SimpleStreamTransducers {
     /*
      * Exercise 5: Implement `|>`. Let the types guide your implementation.
      */
-    def |>[O2](p2: Process[O,O2]): Process[I,O2] = ???
+    def |>[O2](p2: Process[O,O2]): Process[I,O2] =
+      p2 match {
+          case Halt() => Halt()
+          case Emit(h,t) => Emit(h, this |> t)
+          case Await(f) => this match {
+            case Emit(h,t) => t |> f(Some(h))
+            case Halt() => Halt() |> f(None) 
+            case Await(g) => Await((i: Option[I]) => g(i) |> p2)
+         }
+      }
 
     /*
      * Feed `in` to this `Process`. Uses a tail recursive loop as long
@@ -200,8 +209,22 @@ object SimpleStreamTransducers {
     /*
      * Exercise 6: Implement `zipWithIndex`.
      */
-    def zipWithIndex: Process[I,(O,Int)] = ???
+    def zipWithIndex: Process[I,(O,Int)] = {
+      def go(index: Int): Process[O, (O, Int)] = 
+        await(o => emit((o, index), go(index + 1))) 
 
+      this |> go(0)
+    }
+
+    def zip[O2](p: Process[I, O2]): Process[I, (O, O2)] =
+      (this, p) match {
+        case (Halt(), _) => Halt()
+        case (_, Halt()) => Halt()
+        case (Emit(h1, t1), Emit(h2, t2)) => Emit((h1, h2), t1 zip t2)
+        case (_, Await(f)) => Await((i: Option[I]) => Process.feed(i)(this) zip f(i))
+        case (Await(f), _) => Await((i: Option[I]) => f(i) zip Process.feed(i)(p))
+      }
+      
     /* Add `p` to the fallback branch of this process */
     def orElse(p: Process[I,O]): Process[I,O] = this match {
       case Halt() => p
@@ -381,7 +404,11 @@ object SimpleStreamTransducers {
      * We choose to emit all intermediate values, and not halt.
      * See `existsResult` below for a trimmed version.
      */
-    def exists[I](f: I => Boolean): Process[I,Boolean] = ???
+    def exists[I](f: I => Boolean): Process[I,Boolean] = 
+      loop(false) {
+        case (_, true)  => (true, true)
+        case (i, false) => (f(i), f(i))
+      }
 
     /* Awaits then emits a single value, then halts. */
     def echo[I]: Process[I,I] = await(i => emit(i))

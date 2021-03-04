@@ -4,6 +4,8 @@ import fpinscala.iomonad.{IO,Monad,Free,unsafePerformIO}
 import language.implicitConversions
 import language.higherKinds
 import language.postfixOps
+import java.io.PrintWriter
+import scala.concurrent.ExecutionContext
 
 object ImperativeAndLazyIO {
 
@@ -437,6 +439,34 @@ object SimpleStreamTransducers {
       finally s.close
     }
 
+    def convert(in: java.io.File, out: java.io.File): Unit = {
+      def write(w: PrintWriter): Process[String, IO[Unit]] = await { s =>
+        emit(IO(w.write(s)), write(w))
+      }
+      val converter: Process[String, String] =
+        filter[String](_.nonEmpty)
+          .filter(!_.startsWith("#"))
+          .map(_.toDouble)
+          .map(toCelsius)
+          .map(_.toString)
+          .map(_ ++ "\n")
+
+      def go(w: PrintWriter): IO[Unit] = {
+        val proc = converter |> write(w)
+        processFile(in, proc, IO(())) { (x, y) =>
+          for {
+            _ <- x
+            _ <- y
+          } yield ()
+        }.flatMap(x => x)
+      }
+      
+      implicit val ec: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(1)
+      val w = new PrintWriter(out)
+      try {
+        unsafePerformIO(go(w))
+      } finally w.close()
+    }
     /*
      * Exercise 9: Write a program that reads degrees fahrenheit as `Double` values from a file,
      * converts each temperature to celsius, and writes results to another file.

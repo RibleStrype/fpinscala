@@ -6,6 +6,7 @@ import language.higherKinds
 import language.postfixOps
 import java.io.PrintWriter
 import scala.concurrent.ExecutionContext
+import scala.collection.immutable
 
 object ImperativeAndLazyIO {
 
@@ -585,7 +586,16 @@ object GeneralizedStreamTransducers {
      * below, this is not tail recursive and responsibility for stack safety
      * is placed on the `Monad` instance.
      */
-    def runLog(implicit F: MonadCatch[F]): F[IndexedSeq[O]] = ???
+    def runLog(implicit F: MonadCatch[F]): F[IndexedSeq[O]] = {
+      def go(p: Process[F, O], acc: IndexedSeq[O]): F[IndexedSeq[O]] =
+        p match {
+          case Emit(head, tail) => go(tail, head +: acc) 
+          case Halt(End)        => F.unit(acc)
+          case Halt(err)        => F.fail(err)
+          case Await(req, recv) => F.flatMap(F.attempt(req))(ea => go(Try(recv(ea)), acc))
+        }
+      go(this, IndexedSeq.empty)
+    }
 
     /*
      * We define `Process1` as a type alias - see the companion object
